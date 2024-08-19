@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login and WebSocket - Морской Бой</title>
+    <style>
+        #board {
+            display: grid;
+            grid-template-columns: repeat(10, 40px);
+            grid-template-rows: repeat(10, 40px);
+            gap: 1px;
+        }
+        .cell {
+            width: 40px;
+            height: 40px;
+            border: 1px solid black;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .hit {
+            background-color: red;
+        }
+        .miss {
+            background-color: lightgray;
+        }
+    </style>
+    <script>
+        let websocket;
+        let accessToken;
+        let player = "second";
+        swaper = {"first":"second", "second":"first"}
+
+        async function login() {
+            const username = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+
+            const response = await fetch('http://localhost:8000/players/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    'username': username,
+                    'password': password,
+                }),
+                credentials: 'include' // Это важно для отправки куки
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                document.getElementById("login-status").textContent = "Login successful!";
+                accessToken = data.data.access_token; // Сохранить токен для использования в WebSocket
+                initializeWebSocket();
+            } else {
+                document.getElementById("login-status").textContent = data.details || "Login failed.";
+            }
+        }
+
+        function initializeWebSocket() {
+            let gameId = 2; // Укажите ваш game_id
+
+            websocket = new WebSocket(`ws://localhost:8000/games/${gameId}/play?token=${accessToken}`);
+
+            websocket.onopen = function(event) {
+                document.getElementById("status").textContent = "Connected to the WebSocket server.";
+                console.log("WebSocket connection opened");
+            };
+
+            websocket.onclose = function(event) {
+                document.getElementById("status").textContent = "Disconnected from the WebSocket server.";
+                console.log("WebSocket connection closed");
+                if (event.wasClean) {
+                    console.log(`Closed cleanly, code=${event.code}, reason=${event.reason}`);
+                } else {
+                    console.error('Connection died');
+                }
+                websocket.send(JSON.stringify({ service: 'close' }));
+            };
+
+            websocket.onerror = function(event) {
+                document.getElementById("status").textContent = "WebSocket error.";
+                console.error("WebSocket error:", event);
+            };
+
+            websocket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                const cellIndex = data.cell - 1;
+                const cell = document.querySelector(`.cell[data-index="${cellIndex}"]`);
+
+                if (data.message === 'Miss') {
+                    cell.classList.add('miss');
+                } else if (data.message === 'Win' || data.message === 'S') {
+                    cell.classList.add('hit');
+                } else {
+                    console.log(data.message);
+                }
+            };
+        }
+
+        function sendMessage(message) {
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                console.log("Sending message:", message);
+                websocket.send(message);
+            } else {
+                console.error("WebSocket is not open. Unable to send message.");
+            }
+        }
+
+    </script>
+</head>
+<body>
+    <h1>Login and WebSocket Connection - Морской Бой</h1>
+
+    <div id="login-form">
+        <label for="username">Username:</label>
+        <input type="text" id="username" name="username">
+        <br>
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password">
+        <br>
+        <button onclick="login()">Login</button>
+        <div id="login-status"></div>
+    </div>
+
+    <div id="websocket-section" style="margin-top: 20px;">
+        <div id="status" style="border: 1px solid #000; padding: 10px; margin-top: 20px;">Not connected</div>
+        <div id="board" style="border: 1px solid #000; padding: 10px; margin-top: 20px;"></div>
+    </div>
+        <table width="100%" id="main-table">
+            <tr>
+                <td id="board-cell">
+                    <div>
+                        <table id="board2">
+                            <tr>
+                                <button id="11" onclick="cellClick(11)">11</button>
+                                <button id="32" onclick="cellClick(32)">32</button>
+                                <button id="53" onclick="cellClick(53)">53</button>
+                            </tr>
+                        </table>
+                    </div>
+                </td>
+            </tr>
+        </table>
+    <script>
+        function cellClick(id) {
+            console.log(JSON.stringify({service:"",player: player, cell: id }))
+        websocket.send(JSON.stringify({service:"",player: player, cell: id }))
+            player = swaper[player]
+    }
+    </script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login and WebSocket</title>
+    <script>
+        let websocket;
+        let accessToken;
+
+        async function login() {
+            const username = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+
+            const response = await fetch('http://localhost:8000/players/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    'username': username,
+                    'password': password,
+                }),
+                credentials: 'include' // Это важно для отправки куки
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                document.getElementById("login-status").textContent = "Login successful!";
+                accessToken = data.data.access_token; // Сохранить токен для использования в WebSocket
+                initializeWebSocket();
+            } else {
+                document.getElementById("login-status").textContent = data.details || "Login failed.";
+            }
+        }
+
+        function initializeWebSocket() {
+            let gameId = 3; // Укажите ваш game_id
+
+            websocket = new WebSocket(`ws://localhost:8000/games/${gameId}/play?token=${accessToken}`);
+
+            websocket.onopen = function(event) {
+                document.getElementById("status").textContent = "Connected to the WebSocket server.";
+                console.log("WebSocket connection opened");
+            };
+
+            websocket.onclose = function(event) {
+                document.getElementById("status").textContent = "Disconnected from the WebSocket server.";
+                console.log("WebSocket connection closed");
+            };
+
+            websocket.onerror = function(event) {
+                document.getElementById("status").textContent = "WebSocket error.";
+                console.error("WebSocket error:", event);
+            };
+
+            websocket.onmessage = function(event) {
+                console.log("Received message:", event.data);
+                document.getElementById("messages").innerHTML += `<div>${event.data}</div>`;
+            };
+        }
+
+        function sendMessage(message) {
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                console.log("Sending message:", message);
+                websocket.send(message);
+            } else {
+                console.error("WebSocket is not open. Unable to send message.");
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>Login and WebSocket Connection</h1>
+
+    <div id="login-form">
+        <label for="username">Username:</label>
+        <input type="text" id="username" name="username">
+        <br>
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password">
+        <br>
+        <button onclick="login()">Login</button>
+        <div id="login-status"></div>
+    </div>
+
+    <div id="websocket-section" style="margin-top: 20px;">
+        <div id="status" style="border: 1px solid #000; padding: 10px; margin-top: 20px;">Not connected</div>
+        <div id="messages" style="border: 1px solid #000; padding: 10px; margin-top: 20px;"></div>
+        <button onclick="sendMessage('Test message')">Send Test Message</button>
+    </div>
+</body>
+</html>
