@@ -3,7 +3,6 @@ from passlib.context import CryptContext
 from datetime import datetime, timedelta
 import jwt
 from src.config import settings
-from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Настройка BCrypt для хеширования паролей
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

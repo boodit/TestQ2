@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Морской бой</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif; background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+    .container { background:#fff; border-radius:16px; padding:28px; width:min(1200px,100%); box-shadow:0 10px 40px rgba(0,0,0,.25); }
+    h1 { text-align:center; color:#2d3436; margin-bottom:18px; font-size:2.2rem; }
+    h2 { color:#2d3436; margin:18px 0 12px; font-size:1.2rem; }
+    .grid { display:grid; gap:18px; }
+    .row { display:flex; gap:12px; align-items:center; }
+    .row label { min-width:150px; font-weight:600; color:#636e72; }
+    .row input { flex:1; padding:10px 12px; border:2px solid #dfe6e9; border-radius:8px; font-size:14px; }
+    .row input:focus { outline:none; border-color:#667eea; }
+    .btn { padding:10px 16px; border:0; border-radius:8px; color:#fff; background:#667eea; cursor:pointer; transition:transform .15s ease; }
+    .btn:hover { transform:translateY(-1px); }
+    .btn.secondary { background:#f5576c; }
+    .btn.ghost { background:#636e72; }
+    .btn:disabled { opacity:.6; cursor:not-allowed; transform:none; }
+    .section { border:1px solid #ecf0f1; border-radius:12px; padding:16px; }
+    .hidden { display:none; }
+
+    .status { margin:10px 0 14px; padding:12px; border-radius:8px; font-weight:600; text-align:center; }
+    .status.info { background:#dfe6e9; color:#2d3436; }
+    .status.ok { background:#55efc4; color:#00b894; }
+    .status.warn { background:#ffeaa7; color:#d35400; }
+    .status.err { background:#fab1a0; color:#c0392b; }
+    .status.turn-me { background:#a29bfe; color:#2d3436; }
+    .status.turn-op { background:#fd79a8; color:#2d3436; }
+
+    .boards { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-top:8px; }
+    .board-wrap { display:flex; flex-direction:column; align-items:center; gap:10px; }
+    .board-title { font-weight:700; color:#2d3436; }
+    .board { display:grid; grid-template-columns:repeat(10,40px); grid-template-rows:repeat(10,40px); gap:2px; background:#2d3436; padding:2px; border-radius:8px; user-select:none; }
+    .cell { background:#e3f2fd; border:1px solid #90caf9; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; cursor:pointer; transition:transform .1s ease, background .2s; }
+    .cell:hover { transform:scale(1.05); background:#d6ecff; }
+    .my .cell { cursor:default; }
+    .hit { background:#e74c3c; color:#fff; }
+    .miss { background:#95a5a6; color:#fff; }
+    .sunk { background:#c0392b; color:#fff; }
+    .disabled { pointer-events:none; opacity:.65; }
+
+    .log { background:#f5f6fa; border-radius:10px; padding:10px; height:160px; overflow:auto; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px; }
+    .log .ln { padding:4px 6px; border-left:3px solid #667eea; background:#fff; border-radius:6px; margin:6px 0; }
+    @media (max-width:900px){ .boards{ grid-template-columns:1fr; } .board{ grid-template-columns:repeat(10,32px); grid-template-rows:repeat(10,32px);} }
+  </style>
+</head>
+<body>
+  <div class="container grid">
+    <h1>⚓ Морской бой</h1>
+
+    <div id="auth" class="section grid">
+      <h2>Авторизация</h2>
+      <div class="row">
+        <label for="loginUsername">Имя пользователя</label>
+        <input id="loginUsername" placeholder="player1"/>
+      </div>
+      <div class="row">
+        <label for="loginPassword">Пароль</label>
+        <input id="loginPassword" type="password" placeholder="********"/>
+      </div>
+      <div class="row">
+        <button class="btn" onclick="login()">Войти</button>
+        <button class="btn ghost" onclick="registerUser()">Зарегистрироваться</button>
+      </div>
+      <div id="authMsg" class="status info">Введите данные и нажмите «Войти»</div>
+    </div>
+
+    <div id="lobby" class="section grid hidden">
+      <h2>Лобби</h2>
+      <div class="row"><strong id="hello"></strong></div>
+      <div class="row">
+        <label for="secondPlayer">Второй игрок</label>
+        <input id="secondPlayer" placeholder="player2"/>
+      </div>
+      <div class="row">
+        <button class="btn" onclick="createGame()">Создать игру</button>
+        <button class="btn secondary" onclick="logout()">Выйти</button>
+      </div>
+
+      <h2>Подключение к игре</h2>
+      <div class="row">
+        <label for="gameId">ID игры</label>
+        <input id="gameId" type="number" placeholder="Напр. 1"/>
+      </div>
+      <div class="row">
+        <button class="btn" onclick="connect()">Подключиться</button>
+      </div>
+      <div id="lobbyMsg" class="status info">Создайте игру или введите ID и подключитесь</div>
+    </div>
+
+    <div id="game" class="section grid hidden">
+      <h2>Игра</h2>
+      <div id="gameStatus" class="status info">Ожидание...</div>
+
+      <div class="boards">
+        <div class="board-wrap">
+          <div class="board-title">Ваше поле</div>
+          <div id="myBoard" class="board my"></div>
+        </div>
+        <div class="board-wrap">
+          <div class="board-title">Поле противника</div>
+          <div id="opponentBoard" class="board"></div>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <button class="btn secondary" onclick="leave()">Покинуть игру</button>
+      </div>
+
+      <h2>События</h2>
+      <div id="log" class="log"></div>
+    </div>
+  </div>
+
+<script>
+  const API_HOST = location.hostname || 'localhost';
+  const API_PORT = 9696;
+  const API_BASE = `http://${API_HOST}:${API_PORT}`;
+
+  let token = null;
+  let username = null;
+  let ws = null;
+  let myPlayer = null;
+  let isMyTurn = false;
+  let gameEnded = false;
+
+  function $(id){ return document.getElementById(id); }
+  function show(id, flag){ $(id).classList.toggle('hidden', !flag); }
+  function statusBox(el, cls, text){ el.className = `status ${cls}`; el.textContent = text; }
+  function log(msg){ const ln = document.createElement('div'); ln.className='ln'; ln.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`; $('log').appendChild(ln); $('log').scrollTop = $('log').scrollHeight; }
+
+  async function registerUser(){
+    const u = $('loginUsername').value.trim();
+    const p = $('loginPassword').value.trim();
+    if(!u || !p){ statusBox($('authMsg'),'warn','Заполните поля'); return; }
+    try{
+      const r = await fetch(`${API_BASE}/players/register`,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u,password:p}) });
+      const d = await r.json();
+      if(r.ok && d.status==='success'){ statusBox($('authMsg'),'ok','Регистрация успешна, войдите'); }
+      else{ statusBox($('authMsg'),'err', d.details || 'Ошибка регистрации'); }
+    }catch(e){ statusBox($('authMsg'),'err', `Сеть: ${e}`); }
+  }
+
+  async function login(){
+    const u = $('loginUsername').value.trim();
+    const p = $('loginPassword').value.trim();
+    if(!u || !p){ statusBox($('authMsg'),'warn','Заполните поля'); return; }
+    try{
+      const form = new URLSearchParams({username:u, password:p});
+      const r = await fetch(`${API_BASE}/players/login`,{ method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:form, credentials:'include' });
+      const d = await r.json();
+      if(r.ok && d.status==='success'){
+        username = d.data.username;
+        token = d.data.access_token;
+        $('hello').textContent = `Привет, ${username}!`;
+        statusBox($('lobbyMsg'),'info','Создайте игру или подключитесь по ID');
+        show('auth', false); show('lobby', true);
+      }else{
+        statusBox($('authMsg'),'err', d.details || 'Ошибка входа');
+      }
+    }catch(e){ statusBox($('authMsg'),'err', `Сеть: ${e}`); }
+  }
+
+  function logout(){
+    token = null; username = null; myPlayer = null; isMyTurn = false; gameEnded = false;
+    show('game', false); show('lobby', false); show('auth', true);
+    statusBox($('authMsg'),'info','Введите данные и нажмите «Войти»');
+  }
+
+  async function createGame(){
+    const second = $('secondPlayer').value.trim();
+    if(!second){ statusBox($('lobbyMsg'),'warn','Введите имя второго игрока'); return; }
+    try{
+      const r = await fetch(`${API_BASE}/games/create?second_player_username=${encodeURIComponent(second)}`,{ method:'POST', headers:{Authorization:`Bearer ${token}`}, credentials:'include' });
+      const d = await r.json();
+      if(r.ok && d.status==='success'){
+        $('gameId').value = d.data.game_id;
+        statusBox($('lobbyMsg'),'ok',`Игра создана. ID: ${d.data.game_id}`);
+      }else{
+        statusBox($('lobbyMsg'),'err', d.details || 'Ошибка создания игры');
+      }
+    }catch(e){ statusBox($('lobbyMsg'),'err', `Сеть: ${e}`); }
+  }
+
+  function connect(){
+    const id = $('gameId').value.trim();
+    if(!id){ statusBox($('lobbyMsg'),'warn','Введите ID игры'); return; }
+    if(!token){ statusBox($('lobbyMsg'),'warn','Сначала войдите'); return; }
+
+    $('log').innerHTML = '';
+    myPlayer = null; isMyTurn = false; gameEnded = false;
+
+    buildBoard('myBoard', false);
+    buildBoard('opponentBoard', true);
+
+    const url = `ws://${API_HOST}:${API_PORT}/games/${id}/play?token=${token}`;
+    ws = new WebSocket(url);
+
+    ws.onopen = ()=>{ show('lobby', false); show('game', true); statusBox($('gameStatus'),'info','Соединение установлено, ожидание игроков'); log('WS open'); };
+    ws.onerror = ()=>{ statusBox($('gameStatus'),'err','Ошибка WebSocket'); log('WS error'); };
+    ws.onclose = ev=>{ statusBox($('gameStatus'),'warn',`Соединение закрыто (${ev.code}${ev.reason?`: ${ev.reason}`:''})`); log(`WS close ${ev.code}`); };
+
+    ws.onmessage = ev=>{
+      const data = JSON.parse(ev.data);
+      handleMessage(data);
+    };
+  }
+
+  function leave(){
+    if(ws && ws.readyState===WebSocket.OPEN) ws.close();
+    show('game', false); show('lobby', true);
+    statusBox($('lobbyMsg'),'info','Создайте игру или подключитесь по ID');
+  }
+
+  function buildBoard(id, clickable){
+    const el = $(id); el.innerHTML = '';
+    for(let i=1;i<=100;i++){
+      const c = document.createElement('div');
+      c.className='cell'; c.dataset.cell=String(i);
+      if(clickable) c.onclick = ()=> shoot(i);
+      el.appendChild(c);
+    }
+    if(id==='myBoard') el.classList.add('my');
+  }
+
+  function renderBoardFromArray(containerId, arr, isOpponent){
+    const el = $(containerId);
+    if(!el) return;
+    el.querySelectorAll('.cell').forEach(cell=>{
+      cell.classList.remove('hit','miss','sunk','disabled');
+      cell.textContent = '';
+    });
+    for(let r=0; r<10; r++){
+      for(let c=0; c<10; c++){
+        const idx = r*10 + c + 1;
+        const val = arr?.[r]?.[c];
+        const cell = el.querySelector(`.cell[data-cell="${idx}"]`);
+        if(!cell) continue;
+        if(val === 'M'){
+          cell.classList.add('miss'); cell.textContent='•';
+        }else if(val === 'S'){
+          cell.classList.add('hit'); cell.textContent='×';
+        }else if(typeof val === 'string' && val.includes('/D')){
+          cell.classList.add('sunk'); cell.textContent='💥';
+        }else{
+          if(!isOpponent && typeof val === 'number' && val > 0){
+            cell.style.background = '#b8f5b2';
+          }
+        }
+      }
+    }
+    if(isOpponent) el.querySelectorAll('.cell').forEach(c=>c.classList.remove('disabled'));
+  }
+
+  function shoot(cell){
+    if(gameEnded){ log('Ход после завершения — блок'); return; }
+    if(!ws || ws.readyState!==WebSocket.OPEN){ log('Нет соединения'); return; }
+    if(!isMyTurn){ log('Не ваш ход'); return; }
+
+    const el = document.querySelector(`#opponentBoard .cell[data-cell="${cell}"]`);
+    if(!el){ log('Клетка не найдена'); return; }
+    if(el.classList.contains('hit') || el.classList.contains('miss') || el.classList.contains('sunk')){
+      log('Клетка уже атакована'); return;
+    }
+    ws.send(JSON.stringify({ cell:String(cell) }));
+    log(`Выстрел: ${cell}`);
+  }
+
+  function handleMessage(msg){
+    if (msg?.type === 'state' && msg.data) {
+      myPlayer = msg.data.role;
+      isMyTurn = msg.data.current_turn === myPlayer;
+      renderBoardFromArray('myBoard', msg.data.my_view, false);
+      renderBoardFromArray('opponentBoard', msg.data.opponent_view, true);
+      statusBox($('gameStatus'), isMyTurn ? 'turn-me' : 'turn-op', isMyTurn ? 'Ваш ход!' : 'Ход противника...');
+      log(`Снимок: роль=${myPlayer}, ход=${msg.data.current_turn || 'n/a'}`);
+      return;
+    }
+
+    if(msg && msg.status==='success' && msg.data){
+      if(msg.data.init_message){
+        myPlayer = msg.data.player;
+        if(myPlayer==='first'){ statusBox($('gameStatus'),'info','Ожидание второго игрока...'); isMyTurn=false; }
+        else{ statusBox($('gameStatus'),'turn-me','Ваш ход!'); isMyTurn=true; }
+        log(`Роль: ${myPlayer}`);
+        return;
+      }
+      if(msg.data.message === 'opponent_joined'){
+        statusBox($('gameStatus'),'turn-op','Ход противника...');
+        isMyTurn = false;
+        log('Противник подключился');
+        return;
+      }
+    }
+
+    if(msg?.type === 'error' && msg.message === 'not_your_turn'){
+      log('Сервер: не ваш ход');
+      return;
+    }
+
+    if(msg?.type === 'shot' && msg.cell && msg.message){
+      const cell = parseInt(msg.cell,10);
+      const shooter = msg.player;
+      const isMyMove = (shooter === myPlayer);
+      const boardId = isMyMove ? 'opponentBoard' : 'myBoard';
+      const el = document.querySelector(`#${boardId} .cell[data-cell="${cell}"]`);
+      if(!el){ log(`Нет клетки ${cell} на ${boardId}`); return; }
+
+      if(msg.message === 'miss'){
+        el.classList.add('miss'); el.textContent='•';
+        log(isMyMove ? `Промах по ${cell}` : `Соперник промахнулся (${cell})`);
+        isMyTurn = !isMyMove;
+        statusBox($('gameStatus'), isMyTurn?'turn-me':'turn-op', isMyTurn?'Ваш ход!':'Ход противника...');
+        return;
+      }
+      if(msg.message === 'win'){
+        log(isMyMove ? 'Победа!' : 'Поражение');
+        gameEnded = true;
+        statusBox($('gameStatus'),'ok', isMyMove?'Вы победили!':'Вы проиграли');
+        document.querySelectorAll('#opponentBoard .cell').forEach(c=>c.classList.add('disabled'));
+        return;
+      }
+      if (typeof msg.message === 'string' && msg.message.includes('/D')) {
+          const cell = parseInt(msg.cell,10);
+          const isMyMove = (msg.player === myPlayer);
+          const boardId = isMyMove ? 'opponentBoard' : 'myBoard';
+          const el = document.querySelector(`#${boardId} .cell[data-cell="${cell}"]`);
+          if (el) { el.classList.add('sunk'); el.textContent = '💥'; }
+          log(isMyMove ? `Корабль уничтожен (${cell})` : `Ваш корабль уничтожен (${cell})`);
+          // После потопления ход ПЕРЕХОДИТ сопернику
+          isMyTurn = !isMyMove;
+          statusBox($('gameStatus'), isMyTurn ? 'turn-me' : 'turn-op', isMyTurn ? 'Ваш ход!' : 'Ход противника...');
+          return;
+        }
+
+      if(msg.message === 'Uncorrected cell'){
+        log('Некорректная клетка/повторный выстрел');
+        return;
+      }
+      el.classList.add('hit'); el.textContent='×';
+      log(isMyMove ? `Попадание (${cell})` : `Попадание соперника (${cell})`);
+      isMyTurn = isMyMove;
+      statusBox($('gameStatus'), isMyTurn?'turn-me':'turn-op', isMyTurn?'Ваш ход!':'Ход противника...');
+    }
+
+  }
+</script>
+</body>
+</html>

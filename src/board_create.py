@@ -9,7 +9,7 @@ def create_empty_board(size=10):
 def can_place_ship(board, x, y, length, orientation):
     directions = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
 
-    if orientation == 'horizontal':
+    if orientation == "horizontal":
         if y + length > len(board):
             return False
         for i in range(length):
@@ -19,7 +19,7 @@ def can_place_ship(board, x, y, length, orientation):
                 nx, ny = x + dx, y + i + dy
                 if 0 <= nx < len(board) and 0 <= ny < len(board) and board[nx][ny] != 0:
                     return False
-    elif orientation == 'vertical':
+    elif orientation == "vertical":
         if x + length > len(board):
             return False
         for i in range(length):
@@ -32,13 +32,13 @@ def can_place_ship(board, x, y, length, orientation):
     return True
 
 
-def place_ship(board, x, y, length, orientation,num):
-    if orientation == 'horizontal':
+def place_ship(board, x, y, length, orientation, num):
+    if orientation == "horizontal":
         for i in range(length):
-            board[x][y + i] = length + (num/10)
-    elif orientation == 'vertical':
+            board[x][y + i] = length + (num / 10)
+    elif orientation == "vertical":
         for i in range(length):
-            board[x + i][y] = length + (num/10)
+            board[x + i][y] = length + (num / 10)
 
 
 def generate_board():
@@ -48,11 +48,11 @@ def generate_board():
         for num in range(count):
             placed = False
             while not placed:
-                orientation = random.choice(['horizontal', 'vertical'])
+                orientation = random.choice(["horizontal", "vertical"])
                 x = random.randint(0, len(board) - 1)
                 y = random.randint(0, len(board) - 1)
                 if can_place_ship(board, x, y, length, orientation):
-                    place_ship(board, x, y, length, orientation, num+1)
+                    place_ship(board, x, y, length, orientation, num + 1)
                     placed = True
     return board
 
